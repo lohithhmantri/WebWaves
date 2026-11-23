@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Team sign in | Web Waves</title>
+<style>:root{color-scheme:dark;--bg:#071b1a;--card:#0d2926;--line:rgba(241,217,164,.22);--gold:#eac97c;--txt:#faf6ec;--mut:#b9c7bd}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:24px 16px 60px}h1,h2{margin:.2em 0}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0}label{display:block;margin:12px 0 4px;font-size:13px}input,textarea,select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:#071b1a;color:var(--txt);font:inherit}textarea{min-height:140px}button{padding:11px 16px;border-radius:10px;border:0;background:var(--gold);color:#102921;font-weight:700;cursor:pointer;margin:8px 8px 0 0}button.sec{background:transparent;color:var(--txt);border:1px solid var(--line)}.msg{color:#f4d1b8;margin-top:10px}.ok{color:#bfe8c9}table{width:100%;border-collapse:collapse}.wrap{overflow-x:auto}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:13px}pre{white-space:pre-wrap;word-break:break-word}</style></head>
+<body><main id="root"><p>Loading…</p></main>
+<script src="../site-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{'use strict';
+const root=document.getElementById('root'),cfg=window.WW_CONFIG||{};
+// Tiny DOM helper: all data is inserted as text (never innerHTML) to prevent XSS from enquiry content.
+const h=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==='class')e.className=v;else if(x.startsWith('on'))e.addEventListener(x.slice(2),v);else e.setAttribute(x,v)}for(const c of k.flat())e.append(c instanceof Node?c:document.createTextNode(c??''));return e};
+const show=(...n)=>{root.replaceChildren(...n)};
+const msg=(t,ok)=>h('p',{class:'msg'+(ok?' ok':''),role:'status'},t);
+if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){show(h('h1',{},'Team area'),h('div',{class:'card'},'Team access is not configured yet. Authentication must be set up before this area can be used.'));return}
+if(!window.supabase){show(h('h1',{},'Team area'),h('div',{class:'card'},'The sign-in library could not be loaded. Please check your connection and try again.'));return}
+const sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+const isAdmin=u=>!!u&&u.app_metadata&&u.app_metadata.role==='webwaves_admin'; // UI gate only; RLS is the real enforcement.
+async function login(){
+  const m=h('div'),email=h('input',{type:'email',autocomplete:'username',required:''}),pw=h('input',{type:'password',autocomplete:'current-password',required:''});
+  const go=async()=>{m.replaceChildren();const{data,error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:pw.value});
+    if(error){m.append(msg('Sign-in failed. Check your details and try again.'));return}
+    if(!isAdmin(data.user)){await sb.auth.signOut();m.append(msg('This account is not authorised for the team area.'));return}
+    dash()};
+  show(h('h1',{},'Web Waves team sign in'),h('div',{class:'card'},h('label',{},'Email',email),h('label',{},'Password',pw),h('button',{onclick:go},'Sign in'),m))}
+async function dash(){
+  const{data:{session}}=await sb.auth.getSession();if(!session||!isAdmin(session.user)){if(session)await sb.auth.signOut();return login()}
+  const body=h('div'),tab=async t=>{body.replaceChildren(h('p',{},'Loading…'));t==='e'?enq(body):ins(body)};
+  show(h('h1',{},'Team dashboard'),h('div',{},h('button',{onclick:()=>tab('e')},'Enquiries'),h('button',{class:'sec',onclick:()=>tab('i')},'Private insights'),h('button',{class:'sec',onclick:async()=>{await sb.auth.signOut();login()}},'Sign out')),body);tab('e')}
+async function enq(box){
+  const{data,error}=await sb.from('webwaves_enquiries').select('*').order('created_at',{ascending:false}).limit(200);
+  if(error){box.replaceChildren(msg('Could not load enquiries.'));return}
+  const detail=h('pre'),rows=data.map(r=>{const s=h('select',{'aria-label':'Status'},...['new','contacted','qualified','closed'].map(v=>{const o=h('option',{value:v},v);if(v===r.status)o.selected=true;return o}));
+    s.addEventListener('change',async()=>{const{error:e}=await sb.from('webwaves_enquiries').update({status:s.value}).eq('id',r.id);if(e){s.value=r.status;alert('Update failed.')}else r.status=s.value});
+    return h('tr',{},h('td',{},new Date(r.created_at).toLocaleString()),h('td',{},r.name),h('td',{},r.email),h('td',{},r.service),h('td',{},s),h('td',{},h('button',{class:'sec',onclick:()=>{detail.textContent=['Name: '+r.name,'Email: '+r.email,'Phone: '+(r.phone||'-'),'Company: '+(r.company||'-'),'Service: '+r.service,'Budget: '+(r.budget||'-'),'Email notification: '+r.email_status,'WhatsApp notification: '+r.whatsapp_status,'','Message:',r.message].join('\n')}},'View')))});
+  box.replaceChildren(h('div',{class:'card wrap'},data.length?h('table',{},h('thead',{},h('tr',{},...['Received','Name','Email','Service','Status',''].map(x=>h('th',{},x)))),h('tbody',{},...rows)):h('p',{},'No enquiries yet.')),h('div',{class:'card'},h('h2',{},'Selected enquiry'),detail))}
+async function ins(box){
+  const{data,error}=await sb.from('webwaves_private_insights').select('*').order('created_at',{ascending:false});
+  if(error){box.replaceChildren(msg('Could not load insights.'));return}
+  const t=h('input',{maxlength:'200'}),b=h('textarea',{maxlength:'20000'}),m=h('div');
+  const add=async()=>{const{error:e}=await sb.from('webwaves_private_insights').insert({title:t.value.trim(),body:b.value.trim()});if(e){m.replaceChildren(msg('Could not save. Title and body are required.'));return}ins(box)};
+  box.replaceChildren(h('div',{class:'card'},h('h2',{},'New private insight'),h('p',{},'Visible only to signed-in team members.'),h('label',{},'Title',t),h('label',{},'Insight',b),h('button',{onclick:add},'Save'),m),
+    ...data.map(r=>h('div',{class:'card'},h('h2',{},r.title),h('small',{},new Date(r.created_at).toLocaleString()),h('pre',{},r.body),h('button',{class:'sec',onclick:async()=>{if(confirm('Delete this insight?')){await sb.from('webwaves_private_insights').delete().eq('id',r.id);ins(box)}}},'Delete'))))}
+dash();
+})();
+</script></body></html>
