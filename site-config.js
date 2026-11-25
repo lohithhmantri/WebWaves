@@ -1,8 +1,7 @@
-/* Public, non-secret configuration. The Supabase anon key and Turnstile SITE key are designed to be public.
-   NEVER put the service-role key, Resend key, WhatsApp token, Turnstile secret or any phone number here. */
+/* Public browser configuration. Only publishable keys belong here. */
 window.WW_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://vbbweuxbiljhlzjsgqwv.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_UbviE_dkr0XU-vURs7dNzw_UuHfNmPD",
   TURNSTILE_SITE_KEY: "",
-  FORM_ENABLED: false   // keep false until all backend tests have passed
+  FORM_ENABLED: true
 };
